@@ -1,0 +1,6 @@
+[submodule "diffvg"]
+	path = diffvg
+	url = https://github.com/BachiLi/diffvg.git
+[submodule "LIVE"]
+	path = LIVE
+	url = https://github.com/Picsart-AI-Research/LIVE-Layerwise-Image-Vectorization.git

@@ -4,3 +4,6 @@
 [submodule "LIVE"]
 	path = LIVE
 	url = https://github.com/Picsart-AI-Research/LIVE-Layerwise-Image-Vectorization.git
+[submodule "Useg"]
+	path = Useg
+	url = https://github.com/u2seg/U2Seg.git

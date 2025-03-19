@@ -400,6 +400,7 @@ def live_run(
     num_segments=4,
     seed=None,
     debug=False,
+    mask: Union[None, np.ndarray] = None,
 ):
     ###############
     # make config #
@@ -578,6 +579,17 @@ def live_run(
             scheduler = LambdaLR(optim, lr_lambda=lrlambda_f, last_epoch=cfg.num_iter)
         optim_schedular_dict[path_idx] = (optim, scheduler)
 
+        if mask is not None:
+            # Make mask tensor
+            mask_tensor = torch.FloatTensor(mask).to(device)
+
+            # Mask is 2D array, so expand to each colour channel
+            if len(mask_tensor.shape) == 2:
+                mask_tensor = mask_tensor.unsqueeze(0).repeat(3, 1, 1)
+        else:
+            mask_tensor = torch.ones_like(gt)
+        gt = torch.where(mask_tensor == 1, gt, torch.ones_like(gt))
+
         # Inner loop training
         t_range = tqdm(range(cfg.num_iter))
         for t in t_range:
@@ -618,6 +630,7 @@ def live_run(
                 ).to(device)
                 loss = ((x - gt) * (color_reweight.view(1, -1, 1, 1))) ** 2
             else:
+                # loss is mean squared error between output image and target image with mask
                 loss = (x - gt) ** 2
 
             if cfg.loss.use_l1_loss:

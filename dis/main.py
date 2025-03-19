@@ -4,6 +4,7 @@ import sys
 import os
 from detectron2.structures.instances import Instances
 from matplotlib import pyplot as plt
+import torch
 
 # Get the absolute path to the 'dep' directory
 dep_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "Useg"))
@@ -14,6 +15,7 @@ sys.path.append(dep_dir)
 from main_live import live_run
 import predictor, u2seg_demo
 from u2seg_demo import VisualizationDemo
+import numpy as np
 
 
 def main():
@@ -36,13 +38,20 @@ def main():
     print(instances.get_fields()["pred_masks"].cpu().numpy().shape)
     print("Seg Viz")
     print(seg_viz)
-    segmentation_masks = seg_predictions["panoptic_seg"][0]
-    fig, ax = plt.subplots(2)
+    segmentation_masks: torch.FloatTensor = seg_predictions["panoptic_seg"][0]
+    seg_masks = segmentation_masks.cpu().numpy()
+    seg_mask_layer = np.where(seg_masks == 1, 1, 0)
+
+    fig, ax = plt.subplots(3)
     ax[0].imshow(test_image)
-    ax[1].imshow(segmentation_masks.cpu().numpy())
+    ax[1].imshow(seg_masks)
+    ax[2].imshow(seg_mask_layer)
+    print(seg_mask_layer)
     plt.show()
 
-    live_run(test_image, ["smile"])
+    live_run(
+        test_image, ["smile"], experiment="experiment_exp2_32", mask=seg_mask_layer
+    )
 
 
 if __name__ == "__main__":

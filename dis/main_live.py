@@ -400,7 +400,8 @@ def live_run(
     num_segments=4,
     seed=None,
     debug=False,
-    mask: Union[None, np.ndarray] = None,
+    mask_index: Union[None, int] = None,
+    mask_hierachy: Union[None, np.ndarray] = None,
 ):
     ###############
     # make config #
@@ -579,7 +580,11 @@ def live_run(
             scheduler = LambdaLR(optim, lr_lambda=lrlambda_f, last_epoch=cfg.num_iter)
         optim_schedular_dict[path_idx] = (optim, scheduler)
 
-        if mask is not None:
+        if mask_hierachy is not None:
+            mask = np.where(mask_hierachy == mask_index, 1, 0)
+
+            # for line in mask_hierachy:
+            #     print(line)
             # Make mask tensor
             mask_tensor = torch.FloatTensor(mask).to(device)
 
@@ -589,6 +594,10 @@ def live_run(
         else:
             mask_tensor = torch.ones_like(gt)
         gt = torch.where(mask_tensor == 1, gt, torch.ones_like(gt))
+
+        # x = gt.squeeze(0).permute(1, 2, 0)  # HWC -> NCHW
+        # plt.imshow(x.cpu().numpy())
+        # plt.show()
 
         # Inner loop training
         t_range = tqdm(range(cfg.num_iter))
@@ -819,3 +828,4 @@ def live_run(
             # shutil.rmtree(os.path.join(cfg.experiment_dir, "video-png"))
 
     print("The last loss is: {}".format(loss.item()))
+    return shapes_record, shape_groups_record

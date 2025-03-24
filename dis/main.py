@@ -46,6 +46,10 @@ def main():
 
     seg_masks, num_masks, seg_info = perform_segmentation(test_image)
 
+    seg_info_dict = {"0": {"id": 0, "isthing": False}}
+    for info in seg_info:
+        seg_info_dict[str(info["id"])] = info
+
     # Split single integer tagged image mask into array of binary mask objects
     mask_list = [
         {"mask": np.where(seg_masks == i, 1, 0), "id": i}
@@ -89,6 +93,8 @@ def main():
     # plt.imshow(np.where(mask_list[0]["mask"] == 1, 0, 1), cmap="gray")
     # plt.show()
 
+    layers = []
+
     h = test_image.shape[0]
     w = test_image.shape[1]
 
@@ -97,14 +103,18 @@ def main():
     plt.show()
 
     for i in range(0, num_masks + 1):
-        mask_id = i
-
+        target = test_image if i > 0 else np.asarray(bg_inpainted)
+        mask = mask_list[i]["mask"] if i > 0 else None
+        generation_method = (
+            "experiment_exp2_64"
+            if seg_info_dict[str(i)]["isthing"]
+            else "experiment_exp2_32"
+        )
         new_shapes, new_shape_groups = live_run(
-            test_image,
-            ["smile"],
-            experiment="experiment_exp2_32",
-            mask_hierachy=seg_masks,
-            mask_index=mask_id,
+            target,
+            ["TestVectorisation"],
+            experiment=generation_method,
+            mask=mask,
         )
         layers.append((new_shapes, new_shape_groups))
 

@@ -400,8 +400,7 @@ def live_run(
     num_segments=4,
     seed=None,
     debug=False,
-    mask_index: Union[None, int] = None,
-    mask_hierachy: Union[None, np.ndarray] = None,
+    mask=None,
 ):
     ###############
     # make config #
@@ -580,11 +579,7 @@ def live_run(
             scheduler = LambdaLR(optim, lr_lambda=lrlambda_f, last_epoch=cfg.num_iter)
         optim_schedular_dict[path_idx] = (optim, scheduler)
 
-        if mask_hierachy is not None:
-            mask = np.where(mask_hierachy == mask_index, 1, 0)
-
-            # for line in mask_hierachy:
-            #     print(line)
+        if mask is not None:
             # Make mask tensor
             mask_tensor = torch.FloatTensor(mask).to(device)
 

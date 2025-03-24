@@ -1,5 +1,10 @@
 from typing import cast
+from scipy.ndimage import binary_dilation
+from PIL import Image
 import cv2
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import (
+    StableDiffusionInpaintPipeline,
+)
 import uuid
 from datasets import Dataset, load_dataset
 import sys
@@ -20,6 +25,9 @@ from save_svg_composed import save_svg_composed
 import predictor, u2seg_demo
 from u2seg_demo import VisualizationDemo
 import numpy as np
+
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
 def main():
@@ -76,10 +84,17 @@ def main():
     # ax[1].imshow(seg_masks)
     # plt.show()
 
-    layers = []
+    # Show image and mask as greyscale
+    # plt.imshow(test_image)
+    # plt.imshow(np.where(mask_list[0]["mask"] == 1, 0, 1), cmap="gray")
+    # plt.show()
 
     h = test_image.shape[0]
     w = test_image.shape[1]
+
+    bg_inpainted = inpaint_bg(test_image, mask_list[0]["mask"])
+    plt.imshow(np.asarray(bg_inpainted))
+    plt.show()
 
     for i in range(0, num_masks + 1):
         mask_id = i
@@ -123,7 +138,6 @@ def perform_segmentation(test_image):
 
 def perform_depth_estimation(test_image):
     print(test_image)
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     model = DepthAnythingV2(
         encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024]
@@ -136,6 +150,45 @@ def perform_depth_estimation(test_image):
 
     depth = model.infer_image(np.array(test_image))
     return depth
+
+
+def inpaint_bg(bg, mask):
+    image = Image.fromarray(bg.astype("uint8")).convert("RGB")
+    inv_mask = np.where(mask == 0, 255, 0)
+    inv_mask = dilate_mask(inv_mask)
+    mask_image = Image.fromarray(inv_mask.astype("uint8")).convert("RGB")
+    pipe = StableDiffusionInpaintPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-2-inpainting",
+        torch_dtype=torch.float16,
+    )
+    pipe.to(device)
+
+    original_width, original_height = image.size
+
+    width = (original_width // 8) * 8
+    height = (original_height // 8) * 8
+
+    image = image.resize((width, height))
+    mask_image = mask_image.resize((width, height))
+
+    image_result = pipe(
+        image=image,
+        mask_image=mask_image,
+        prompt="background",
+        height=height,
+        width=width,
+        guidance_scale=1.0,
+    ).images[0]
+    inpainted_image = image_result.resize((original_width, original_height))
+    return inpainted_image
+
+
+def dilate_mask(mask_array, dilation_iterations=5):
+    binary_mask = mask_array > 0
+    dilated_mask = binary_dilation(binary_mask, iterations=dilation_iterations)
+
+    # Convert back and return
+    return dilated_mask.astype(np.uint8) * 255
 
 
 if __name__ == "__main__":

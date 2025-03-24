@@ -119,9 +119,7 @@ def main():
         layers.append((new_shapes, new_shape_groups))
 
     # Make UUID to save svg
-    save_svg_composed(
-        "composed_images/" + str(uuid.uuid4()) + ".svg", w, h, layers[::-1]
-    )
+    save_svg_composed("composed_images/" + str(uuid.uuid4()) + ".svg", w, h, layers)
 
 
 def perform_segmentation(test_image):

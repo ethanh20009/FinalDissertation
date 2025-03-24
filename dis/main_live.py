@@ -33,7 +33,7 @@ from xing_loss import xing_loss
 
 import yaml
 from easydict import EasyDict as edict
-
+from scipy.ndimage import distance_transform_edt
 
 pydiffvg.set_print_timing(False)
 gamma = 1.0
@@ -590,6 +590,12 @@ def live_run(
             mask_tensor = torch.ones_like(gt)
         gt = torch.where(mask_tensor == 1, gt, torch.ones_like(gt))
 
+        # Create gradient loss towards areas of optimisation
+        loss_edt = torch.FloatTensor(
+            distance_transform_edt(np.where(mask == 0, 1, 0))
+        ).to(device)
+        loss_edt = loss_edt.unsqueeze(-1)
+
         # Show current layer target
         # x = gt.squeeze(0).permute(1, 2, 0)  # HWC -> NCHW
         # plt.imshow(x.cpu().numpy())
@@ -608,6 +614,7 @@ def live_run(
             img = render(w, h, 2, 2, t, None, *scene_args)
 
             # Compose img with white background
+            rendered_alpha = img[:, :, 3:4]
             img = img[:, :, 3:4] * img[:, :, :3] + para_bg * (1 - img[:, :, 3:4])
 
             if cfg.save.video:
@@ -636,7 +643,17 @@ def live_run(
                 loss = ((x - gt) * (color_reweight.view(1, -1, 1, 1))) ** 2
             else:
                 # loss is mean squared error between output image and target image with mask
-                loss = (x - gt) ** 2
+                out_of_bounds_pen = rendered_alpha * loss_edt
+                # Align 2d penalisation with 3 colour channels
+                out_of_bounds_pen = (
+                    out_of_bounds_pen.unsqueeze(0)
+                    .repeat(1, 1, 1, 3)
+                    .permute(0, 3, 1, 2)
+                )
+
+                loss = (((x - gt) ** 2) * mask_tensor) + (
+                    out_of_bounds_pen * (1 - mask_tensor)
+                )
 
             if cfg.loss.use_l1_loss:
                 loss = abs(x - gt)

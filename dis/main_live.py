@@ -595,6 +595,7 @@ def live_run(
             mask_tensor = torch.ones_like(gt)
         gt = torch.where(mask_tensor == 1, gt, torch.ones_like(gt))
 
+        # Show current layer target
         # x = gt.squeeze(0).permute(1, 2, 0)  # HWC -> NCHW
         # plt.imshow(x.cpu().numpy())
         # plt.show()

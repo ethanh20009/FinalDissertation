@@ -7,3 +7,6 @@
 [submodule "Useg"]
 	path = Useg
 	url = https://github.com/u2seg/U2Seg.git
+[submodule "depth-anything"]
+	path = depth_anything
+	url = https://huggingface.co/spaces/depth-anything/Depth-Anything-V2

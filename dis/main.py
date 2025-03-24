@@ -36,12 +36,45 @@ def main():
     # plt.imshow(depth)
     # plt.show()
 
-    seg_masks, num_masks = perform_segmentation(test_image)
+    seg_masks, num_masks, seg_info = perform_segmentation(test_image)
 
-    fig, ax = plt.subplots(3)
-    ax[0].imshow(test_image)
-    ax[1].imshow(seg_masks)
-    plt.show()
+    # Split single integer tagged image mask into array of binary mask objects
+    mask_list = [
+        {"mask": np.where(seg_masks == i, 1, 0), "id": i}
+        for i in range(0, num_masks + 1)
+    ]
+
+    # Find average depth and add to mask object
+    for mask_obj in mask_list:
+        mask_obj["depth"] = np.mean(depth[mask_obj["mask"] == 1])
+
+    # Sort layers from furthest to closest
+    mask_list = sorted(mask_list, key=lambda x: x["depth"])
+
+    # Find background by largest area that is not 'isthing'
+    bg_ids = filter(lambda x: not bool(x["isthing"]), seg_info)
+    max_bg = max(bg_ids, key=lambda x: x["area"])
+
+    # Move the "best" background to the front
+    for i in range(0, len(mask_list)):
+        if mask_list[i]["id"] == max_bg["id"]:
+            mask_list.insert(0, mask_list.pop(i))
+
+    # Plot ordered masks with subplots
+    # fig, ax = plt.subplots(num_masks + 1)
+    #
+    # for i in range(0, num_masks + 1):
+    #     ax[i].imshow(mask_list[i]["mask"])
+    #     ax[i].set_title(
+    #         "ID: " + str(mask_list[i]["id"]) + ", Depth: " + str(mask_list[i]["depth"])
+    #     )
+    # plt.show()
+
+    # Plot original image and segmentation masks
+    # fig, ax = plt.subplots(3)
+    # ax[0].imshow(test_image)
+    # ax[1].imshow(seg_masks)
+    # plt.show()
 
     layers = []
 
@@ -76,10 +109,16 @@ def perform_segmentation(test_image):
     # instances: Instances = seg_predictions["instances"]
     segmentation_masks: torch.FloatTensor = seg_predictions["panoptic_seg"][0]
     segmentation_masks_info: torch.FloatTensor = seg_predictions["panoptic_seg"][1]
+    print(segmentation_masks_info)
     num_masks = len(segmentation_masks_info)
     seg_masks = segmentation_masks.cpu().numpy()
 
-    return seg_masks, num_masks
+    # plt.imshow(seg_viz.get_image())
+    # plt.show()
+    #
+    # plt.imshow(np.where(seg_masks == 1, 1, 0))
+
+    return seg_masks, num_masks, segmentation_masks_info
 
 
 def perform_depth_estimation(test_image):

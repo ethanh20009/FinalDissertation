@@ -47,8 +47,8 @@ def main():
     num_generations = 5
     for image_index in range(num_generations):
         ds_image = ds[int(image_index)]["image"]
-        save_target_img(ds_image)
-        # layered_vectorisation(ds_image)
+        # save_target_img(ds_image)
+        layered_vectorisation(ds_image)
 
 
 def save_target_img(gt):

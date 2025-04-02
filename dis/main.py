@@ -1,4 +1,5 @@
 from typing import cast
+from numpy.typing import NDArray
 from scipy.ndimage import binary_dilation
 from PIL import Image
 import cv2
@@ -24,7 +25,11 @@ from main_live import live_run
 from save_svg_composed import save_svg_composed
 import predictor, u2seg_demo
 from u2seg_demo import VisualizationDemo
+from utils_live import check_and_create_dir
 import numpy as np
+import os.path as osp
+import PIL
+import PIL.Image
 
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -34,17 +39,37 @@ def main():
     print("Loading Dataset...")
     ds = cast(
         Dataset,
-        load_dataset("timm/mini-imagenet", split="train").with_format("numpy"),
+        load_dataset("timm/mini-imagenet", split="train")
+        .shuffle(seed=2)
+        .with_format("numpy"),
     )
-    # Show image
-    test_image = ds[3]["image"]
 
+    num_generations = 5
+    for image_index in range(num_generations):
+        ds_image = ds[int(image_index)]["image"]
+        save_target_img(ds_image)
+        # layered_vectorisation(ds_image)
+
+
+def save_target_img(gt):
+    filename = str(uuid.uuid4())
+    target_path = osp.join("composed_targets", filename + ".png")
+    check_and_create_dir(target_path)
+    PIL.Image.fromarray(gt).save(target_path, "PNG")
+
+
+def layered_vectorisation(gt: NDArray):
+    """
+    Perform layered vectorisation on the input image.
+    Args:
+        gt (numpy.ndarray): The input image.
+    """
     print("Performing depth estimation...")
-    depth = perform_depth_estimation(test_image)
+    depth = perform_depth_estimation(gt)
     # plt.imshow(depth)
     # plt.show()
 
-    seg_masks, num_masks, seg_info = perform_segmentation(test_image)
+    seg_masks, num_masks, seg_info = perform_segmentation(gt)
 
     seg_info_dict = {"0": {"id": 0, "isthing": False}}
     for info in seg_info:
@@ -84,26 +109,29 @@ def main():
 
     # Plot original image and segmentation masks
     # fig, ax = plt.subplots(3)
-    # ax[0].imshow(test_image)
+    # ax[0].imshow(gt)
     # ax[1].imshow(seg_masks)
     # plt.show()
 
     # Show image and mask as greyscale
-    # plt.imshow(test_image)
+    # plt.imshow(gt)
     # plt.imshow(np.where(mask_list[0]["mask"] == 1, 0, 1), cmap="gray")
     # plt.show()
 
     layers = []
 
-    h = test_image.shape[0]
-    w = test_image.shape[1]
+    h = gt.shape[0]
+    w = gt.shape[1]
 
-    bg_inpainted = inpaint_bg(test_image, mask_list[0]["mask"])
-    plt.imshow(np.asarray(bg_inpainted))
-    plt.show()
+    bg_inpainted = inpaint_bg(gt, mask_list[0]["mask"])
 
+    # Show inpaint
+    # plt.imshow(np.asarray(bg_inpainted))
+    # plt.show()
+
+    # Fit svg layer to each mask.
     for i in range(0, num_masks + 1):
-        target = test_image if i > 0 else np.asarray(bg_inpainted)
+        target = gt if i > 0 else np.asarray(bg_inpainted)
         mask = mask_list[i]["mask"] if i > 0 else None
         generation_method = (
             "experiment_exp2_64"
@@ -132,7 +160,6 @@ def perform_segmentation(test_image):
     # instances: Instances = seg_predictions["instances"]
     segmentation_masks: torch.FloatTensor = seg_predictions["panoptic_seg"][0]
     segmentation_masks_info: torch.FloatTensor = seg_predictions["panoptic_seg"][1]
-    print(segmentation_masks_info)
     num_masks = len(segmentation_masks_info)
     seg_masks = segmentation_masks.cpu().numpy()
 
@@ -145,8 +172,6 @@ def perform_segmentation(test_image):
 
 
 def perform_depth_estimation(test_image):
-    print(test_image)
-
     model = DepthAnythingV2(
         encoder="vitl", features=256, out_channels=[256, 512, 1024, 1024]
     )
